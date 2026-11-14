@@ -14,3 +14,19 @@ label{display:block;color:#c3ccda;font-size:13px;font-weight:600;margin:11px 0 8
 #notice{margin-bottom:17px;color:#b6f2ce;background:#142d25;border:1px solid #285c45;padding:12px 15px;border-radius:12px}textarea.field{line-height:1.6;resize:vertical}select.field{cursor:pointer}[hidden]{display:none!important}
 @media(max-width:850px){body{grid-template-columns:1fr}aside{position:relative;height:auto;padding:14px 12px;border-right:0;border-bottom:1px solid var(--line)}.brand{margin:0 8px 14px}nav{display:flex;overflow-x:auto;padding-bottom:4px}nav button{white-space:nowrap;padding:10px 12px}nav button:before{display:none}footer{display:none}main{padding:22px 15px}header{margin-bottom:21px}.stats{grid-template-columns:repeat(auto-fit,minmax(145px,1fr))}.panel{padding:17px}.table{display:block;overflow-x:auto;white-space:nowrap}}
 @media(max-width:480px){.card{margin:7vh auto;padding:30px 20px}.stats{grid-template-columns:1fr 1fr}.stat strong{font-size:20px}header{align-items:flex-start;flex-direction:column}#user{align-self:flex-start}}
+
+/* Freiburg V2 navigation and water-drop pointer */
+nav{overflow-y:auto;overflow-x:hidden;max-height:calc(100vh - 125px);padding-right:4px;scrollbar-width:thin;scrollbar-color:#3a4658 transparent}
+.navgroup{display:grid;gap:5px;margin-bottom:18px}
+.navgroup>small{font-size:10px;font-weight:800;letter-spacing:1.8px;color:#77869b;padding:8px 10px 4px}
+nav button{font-size:12px;padding:9px 11px;border-radius:10px}
+nav button:before{content:'◦';font-size:19px}
+nav button.active{box-shadow:inset 3px 0 #f15a68}
+#cursor-dot{position:fixed;z-index:99999;left:0;top:0;width:9px;height:9px;border-radius:50%;background:#ff6474;box-shadow:0 0 14px #ff6474aa;pointer-events:none;transform:translate(-50%,-50%);transition:width .15s,height .15s,opacity .2s;opacity:0}
+#cursor-dot.visible{opacity:1}
+.cursor-ripple{position:fixed;z-index:99998;pointer-events:none;width:12px;height:12px;border:2px solid #ff6b7b;border-radius:50%;transform:translate(-50%,-50%) scale(.3);animation:water-drop .7s cubic-bezier(.12,.65,.2,1) forwards;box-shadow:0 0 18px #ff596855,inset 0 0 8px #ff596833}
+.cursor-ripple:before,.cursor-ripple:after{content:'';position:absolute;inset:-7px;border:1px solid #ff9aa4;border-radius:50%;animation:water-ring .7s ease-out forwards}
+.cursor-ripple:after{inset:-15px;opacity:.6;animation-delay:.06s}
+@keyframes water-drop{0%{opacity:.95;transform:translate(-50%,-50%) scale(.3)}45%{opacity:.8;transform:translate(-50%,-50%) scale(1.4,1.15)}100%{opacity:0;transform:translate(-50%,-50%) scale(3.8,2.8)}}
+@keyframes water-ring{0%{opacity:.8;transform:scale(.4)}100%{opacity:0;transform:scale(2.1)}}
+@media(hover:none),(pointer:coarse){#cursor-dot,.cursor-ripple{display:none}}
