@@ -59,6 +59,21 @@ app.patch('/api/admin-career/:id',auth,admin,(req,res)=>{try{const list=readCare
 app.delete('/api/admin-career/:id',auth,admin,(req,res)=>{const list=readCareer().filter(x=>x.userId!==req.params.id);writeCareer(list);res.json({ok:true});});
 app.get('/api/bot-config',(req,res)=>{if(!BOT_CONFIG_SECRET||req.get('x-bot-config-secret')!==BOT_CONFIG_SECRET)return res.status(401).json({error:'Unauthorized'});res.json(readBotSettings());});
 
+const UPLOAD_DIR='/data/uploads';
+fs.mkdirSync(UPLOAD_DIR,{recursive:true});
+app.put('/api/uploads/:kind',auth,admin,express.raw({type:'application/octet-stream',limit:'8mb'}),(req,res)=>{
+ try{const kind=String(req.params.kind||'');
+ if(!['welcome','ticket'].includes(kind))return res.status(400).json({error:'Ungültiger Bildtyp.'});
+ if(!Buffer.isBuffer(req.body)||!req.body.length)return res.status(400).json({error:'Keine Bilddatei empfangen.'});
+ const mime=String(req.get('x-file-type')||'').toLowerCase();
+ const ext=({'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/gif':'gif'})[mime];
+ if(!ext)return res.status(415).json({error:'Erlaubt sind PNG, JPG, WEBP und GIF.'});
+ if(req.body.length>8*1024*1024)return res.status(413).json({error:'Bild darf maximal 8 MB groß sein.'});
+ const filename=kind+'-'+Date.now().toString(36)+'-'+crypto.randomBytes(6).toString('hex')+'.'+ext;
+ fs.writeFileSync(path.join(UPLOAD_DIR,filename),req.body,{flag:'wx'});res.json({ok:true,url:'/uploads/'+filename});
+ }catch(e){console.error('Bild-Upload:',e.message);res.status(500).json({error:'Bild konnte nicht gespeichert werden.'});}
+});
+app.use('/uploads',express.static(UPLOAD_DIR,{fallthrough:false,maxAge:'7d'}));
 app.get('/health',(req,res)=>res.json({ok:true,service:'Freiburg V2 Control Center',oauthConfigured:!!SECRET,discordBotConfigured:!!TOKEN}));
 app.use(express.static(path.join(__dirname,'public')));app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public/index.html')));
 app.listen(PORT,'0.0.0.0',()=>console.log('Freiburg V2 Control Center auf Port '+PORT));
