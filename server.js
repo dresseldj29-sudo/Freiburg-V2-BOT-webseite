@@ -32,7 +32,9 @@ app.put('/api/members/:id/ban',auth,admin,async(req,res)=>{try{const days=Math.m
 app.delete('/api/members/:id/ban',auth,admin,async(req,res)=>{try{await bot('/guilds/'+GUILD+'/bans/'+req.params.id,{method:'DELETE'});res.json({ok:true});}catch(e){res.status(500).json({error:e.message});}});
 app.get('/api/bans',auth,admin,async(req,res)=>{try{res.json(await bot('/guilds/'+GUILD+'/bans?limit=1000'));}catch(e){res.status(500).json({error:e.message});}});
 app.get('/api/audit',auth,admin,async(req,res)=>{try{res.json(await bot('/guilds/'+GUILD+'/audit-logs?limit=50'));}catch(e){res.status(500).json({error:e.message});}});
+app.get('/api/guild',auth,admin,async(req,res)=>{try{res.json(await bot('/guilds/'+GUILD));}catch(e){res.status(500).json({error:e.message});}});
 app.patch('/api/guild',auth,admin,async(req,res)=>{try{const body={};if(typeof req.body.name==='string')body.name=req.body.name.slice(0,100);if(typeof req.body.description==='string')body.description=req.body.description.slice(0,120);if(req.body.verification_level!==undefined)body.verification_level=Number(req.body.verification_level);if(req.body.default_message_notifications!==undefined)body.default_message_notifications=Number(req.body.default_message_notifications);res.json(await bot('/guilds/'+GUILD,{method:'PATCH',body:JSON.stringify(body)}));}catch(e){res.status(500).json({error:e.message});}});
 
+app.get('/health',(req,res)=>res.json({ok:true,service:'Freiburg V2 Control Center',oauthConfigured:!!SECRET,discordBotConfigured:!!TOKEN}));
 app.use(express.static(path.join(__dirname,'public')));app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public/index.html')));
 app.listen(PORT,'0.0.0.0',()=>console.log('Freiburg V2 Control Center auf Port '+PORT));
