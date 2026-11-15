@@ -30,3 +30,5 @@ nav button.active{box-shadow:inset 3px 0 #f15a68}
 @keyframes water-drop{0%{opacity:.95;transform:translate(-50%,-50%) scale(.3)}45%{opacity:.8;transform:translate(-50%,-50%) scale(1.4,1.15)}100%{opacity:0;transform:translate(-50%,-50%) scale(3.8,2.8)}}
 @keyframes water-ring{0%{opacity:.8;transform:scale(.4)}100%{opacity:0;transform:scale(2.1)}}
 @media(hover:none),(pointer:coarse){#cursor-dot,.cursor-ripple{display:none}}
+
+.theme-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}.theme-grid label{display:grid;gap:8px}.theme-color{height:48px;width:100%;padding:5px;cursor:pointer}.panel{background:linear-gradient(145deg,var(--surface),#101722)}
