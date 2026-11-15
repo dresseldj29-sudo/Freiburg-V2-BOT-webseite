@@ -5,8 +5,17 @@ const {DISCORD_CLIENT_ID:CID,DISCORD_CLIENT_SECRET:SECRET,DISCORD_BOT_TOKEN:TOKE
 if(!CID||!TOKEN||!GUILD||!PUBLIC_URL){console.error('Fehlende Dashboard-Variablen: CLIENT_ID, BOT_TOKEN, GUILD_ID und PUBLIC_URL werden benötigt.');process.exit(1);} const SESSION_KEY=SESSION&&SESSION!=='ephemeral'?SESSION:crypto.randomBytes(48).toString('hex');
 const API='https://discord.com/api/v10',REDIRECT=new URL('/auth/callback',PUBLIC_URL).toString();
 app.set('trust proxy',1);app.use(helmet({contentSecurityPolicy:{directives:{defaultSrc:["'self'"],scriptSrc:["'self'"],styleSrc:["'self'","'unsafe-inline'"],imgSrc:["'self'",'https:','data:','blob:'],fontSrc:["'self'",'https://fonts.gstatic.com','data:']}}}));
-app.use(express.json({limit:'24kb'}));app.use(session({name:'freiburg.sid',secret:SESSION_KEY,resave:false,saveUninitialized:false,cookie:{httpOnly:true,secure:true,sameSite:'lax',maxAge:8*60*60*1000}}));
-async function bot(path,opts={}){const r=await fetch(API+path,{...opts,headers:{Authorization:'Bot '+TOKEN,'Content-Type':'application/json',...(opts.headers||{})}});const data=r.status===204?null:await r.json().catch(()=>null);if(!r.ok)throw Error(data?.message||'Discord API Fehler '+r.status);return data;}
+app.use(express.json({limit:'24kb'}));class PersistentSessionStore extends session.Store{
+ constructor(){super();this.file='/data/sessions.json';fs.mkdirSync('/data',{recursive:true});this.data={};try{this.data=JSON.parse(fs.readFileSync(this.file,'utf8'))||{};}catch{}}
+ persist(){try{const now=Date.now();for(const [k,v] of Object.entries(this.data))if(!v.cookie||!v.cookie.expires||Date.parse(v.cookie.expires)<now)delete this.data[k];const tmp=this.file+'.tmp';fs.writeFileSync(tmp,JSON.stringify(this.data));fs.renameSync(tmp,this.file);}catch(e){console.error('[SessionStore] Speichern fehlgeschlagen:',e.message);}}
+ get(sid,cb){const v=this.data[sid];if(v?.cookie?.expires&&Date.parse(v.cookie.expires)<Date.now()){delete this.data[sid];this.persist();return cb(null,null);}cb(null,v||null);}
+ set(sid,sess,cb){this.data[sid]=sess;this.persist();cb&&cb(null);}
+ destroy(sid,cb){delete this.data[sid];this.persist();cb&&cb(null);}
+ touch(sid,sess,cb){if(this.data[sid])this.data[sid]=sess;this.persist();cb&&cb(null);}
+}
+const sessionStore=new PersistentSessionStore();
+app.use(session({name:'freiburg.sid',store:sessionStore,secret:SESSION_KEY,resave:false,saveUninitialized:false,cookie:{httpOnly:true,secure:true,sameSite:'lax',maxAge:8*60*60*1000}}));
+async function bot(path,opts={}){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);let r;try{r=await fetch(API+path,{...opts,signal:controller.signal,headers:{Authorization:'Bot '+TOKEN,'Content-Type':'application/json',...(opts.headers||{})}});}finally{clearTimeout(timer);}const data=r.status===204?null:await r.json().catch(()=>null);if(!r.ok)throw Error(data?.message||'Discord API Fehler '+r.status);return data;}
 function auth(req,res,next){if(!req.session.user)return res.status(401).json({error:'Bitte mit Discord anmelden.'});next();}
 function admin(req,res,next){if(!req.session.user?.canManage)return res.status(403).json({error:'Deine Discord-Rolle darf diesen Bereich nicht verwalten.'});next();}
 function ownerAdmin(req,res,next){if(!req.session.user?.ownerAdmin)return res.status(403).json({error:'Nur Discord-Administratoren dürfen die Zugriffsrollen ändern.'});next();}
@@ -78,6 +87,16 @@ app.put('/api/uploads/:kind',auth,admin,express.raw({type:'application/octet-str
  }catch(e){console.error('Bild-Upload:',e.message);res.status(500).json({error:'Bild konnte nicht gespeichert werden.'});}
 });
 app.use('/uploads',express.static(UPLOAD_DIR,{fallthrough:false,maxAge:'7d'}));
+
+const THEME_FILE='/data/site-theme.json';
+const DEFAULT_THEME={primary:'#e34855',background:'#080b12',surface:'#151e2b',text:'#f5f7fb',muted:'#9aa7ba',logoText:'FV',brandText:'FREIBURG V2',font:'DM Sans'};
+function readTheme(){try{fs.mkdirSync('/data',{recursive:true});if(!fs.existsSync(THEME_FILE))fs.writeFileSync(THEME_FILE,JSON.stringify(DEFAULT_THEME));return {...DEFAULT_THEME,...JSON.parse(fs.readFileSync(THEME_FILE,'utf8'))};}catch{return {...DEFAULT_THEME};}}
+app.get('/api/site-theme',auth,admin,(req,res)=>res.json(readTheme()));
+app.put('/api/site-theme',auth,admin,(req,res)=>{try{const x=req.body||{},hex=v=>/^#[0-9a-f]{6}$/i.test(String(v||''))?String(v):null,next={primary:hex(x.primary)||DEFAULT_THEME.primary,background:hex(x.background)||DEFAULT_THEME.background,surface:hex(x.surface)||DEFAULT_THEME.surface,text:hex(x.text)||DEFAULT_THEME.text,muted:hex(x.muted)||DEFAULT_THEME.muted,logoText:String(x.logoText||'FV').slice(0,5),brandText:String(x.brandText||'FREIBURG V2').slice(0,30),font:['DM Sans','Manrope','Arial','Inter','system-ui'].includes(x.font)?x.font:DEFAULT_THEME.font};const tmp=THEME_FILE+'.tmp';fs.writeFileSync(tmp,JSON.stringify(next,null,2));fs.renameSync(tmp,THEME_FILE);res.json({ok:true,theme:next});}catch(e){console.error('[Theme]:',e.message);res.status(500).json({error:'Design konnte nicht gespeichert werden.'});}});
+
 app.get('/health',(req,res)=>res.json({ok:true,service:'Freiburg V2 Control Center',oauthConfigured:!!SECRET,discordBotConfigured:!!TOKEN}));
 app.use(express.static(path.join(__dirname,'public')));app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public/index.html')));
+app.use((err,req,res,next)=>{console.error('[HTTP]',req.method,req.path,err?.stack||err);if(res.headersSent)return next(err);res.status(err?.status||500).json({error:'Interner Fehler. Bitte versuche es erneut.'});});
+process.on('unhandledRejection',e=>console.error('[Dashboard] Unhandled rejection:',e));
+process.on('uncaughtException',e=>{console.error('[Dashboard] Uncaught exception:',e);process.exit(1);});
 app.listen(PORT,'0.0.0.0',()=>console.log('Freiburg V2 Control Center auf Port '+PORT));
